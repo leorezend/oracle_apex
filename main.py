@@ -1,6 +1,5 @@
-from flask import Flask, send_file, abort
-from baixar_imagem import baixar_e_retornar_caminho, montar_termos
-import os
+from flask import Flask, redirect, abort
+from baixar_imagem import montar_termos, baixar_e_retornar_cloudinary_url
 
 app = Flask(__name__)
 
@@ -9,12 +8,13 @@ def servir_imagem(arquivo):
     nome = arquivo.replace("_", " ")
     partes = nome.split()
     if len(partes) < 4:
-        abort(400)  # dados insuficientes
+        abort(400)
 
     marca, modelo, cor, ano = partes[0], partes[1], partes[2], partes[3]
     termos = montar_termos(marca, modelo, cor, ano)
-    caminho = baixar_e_retornar_caminho(termos)
-    if caminho and os.path.exists(caminho):
-        return send_file(caminho, mimetype='image/jpeg')
+    url = baixar_e_retornar_cloudinary_url(termos)
+
+    if url:
+        return redirect(url)
     else:
         abort(404)

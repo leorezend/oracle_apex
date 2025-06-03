@@ -1,6 +1,15 @@
 import os
 from icrawler.builtin import GoogleImageCrawler
 from PIL import Image
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
+
+cloudinary.config(
+    cloud_name='dzqt6j9bj',
+    api_key='999688376561143',
+    api_secret=os.environ.get("CLOUDINARY_SECRET")  # NUNCA fixe no código
+)
 
 def montar_termos(marca, modelo, cor, ano):
     termos = f"{marca} {modelo} {ano} {cor} carro inteiro lateral frente -logo -marca -site"
@@ -10,20 +19,24 @@ def imagem_valida(caminho):
     try:
         with Image.open(caminho) as img:
             largura, altura = img.size
-            if largura < 500 or altura < 300:
-                return False
-            if largura < altura:
+            if largura < 500 or altura < 300 or largura < altura:
                 return False
             return True
     except:
         return False
 
-def baixar_e_retornar_caminho(termos, tentativas=3):
-    nome_arquivo = termos.replace(" ", "_") + ".jpg"
-    caminho_arquivo = os.path.join("imagens", nome_arquivo)
+def imagem_ja_no_cloudinary(nome_publico):
+    try:
+        resultado = cloudinary.api.resource(nome_publico)
+        return resultado['secure_url']
+    except cloudinary.exceptions.NotFound:
+        return None
 
-    if os.path.exists(caminho_arquivo):
-        return caminho_arquivo
+def baixar_e_retornar_cloudinary_url(termos, tentativas=3):
+    nome_publico = termos.replace(" ", "_").lower()
+    url_existente = imagem_ja_no_cloudinary(nome_publico)
+    if url_existente:
+        return url_existente
 
     os.makedirs("imagens", exist_ok=True)
 
@@ -37,11 +50,18 @@ def baixar_e_retornar_caminho(termos, tentativas=3):
             reverse=True
         )
         for arq in arquivos:
-            if arq.endswith(".jpg") and not arq.startswith(termos.replace(" ", "_")):
+            if arq.endswith(".jpg"):
                 caminho_temp = os.path.join("imagens", arq)
                 if imagem_valida(caminho_temp):
-                    os.rename(caminho_temp, caminho_arquivo)
-                    return caminho_arquivo
+                    resultado = cloudinary.uploader.upload(
+                        caminho_temp,
+                        public_id=nome_publico,
+                        folder="veiculos",
+                        overwrite=True,
+                        resource_type="image"
+                    )
+                    os.remove(caminho_temp)
+                    return resultado['secure_url']
                 else:
                     os.remove(caminho_temp)
 

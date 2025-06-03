@@ -2,3 +2,4 @@ Flask
 icrawler
 gunicorn
 pillow
+cloudinary
