@@ -1,51 +1,48 @@
 import os
-import shutil
 from icrawler.builtin import GoogleImageCrawler
-import cloudinary.uploader
-from cloudinary_config import cloudinary
+from PIL import Image
 
-def baixar_e_retornar_url(termos):
-    nome_base = termos.replace(" ", "_").lower()
-    nome_arquivo = nome_base + ".jpg"
+def montar_termos(marca, modelo, cor, ano):
+    termos = f"{marca} {modelo} {ano} {cor} carro inteiro lateral frente -logo -marca -site"
+    return termos
+
+def imagem_valida(caminho):
+    try:
+        with Image.open(caminho) as img:
+            largura, altura = img.size
+            if largura < 500 or altura < 300:
+                return False
+            if largura < altura:
+                return False
+            return True
+    except:
+        return False
+
+def baixar_e_retornar_caminho(termos, tentativas=3):
+    nome_arquivo = termos.replace(" ", "_") + ".jpg"
     caminho_arquivo = os.path.join("imagens", nome_arquivo)
 
-    # Verifica se já temos um cache com URL salva
-    url_cache_path = caminho_arquivo + ".url"
-    if os.path.exists(url_cache_path):
-        with open(url_cache_path, "r") as f:
-            return f.read()
+    if os.path.exists(caminho_arquivo):
+        return caminho_arquivo
 
-    # Cria pastas se necessário
-    os.makedirs("temp", exist_ok=True)
     os.makedirs("imagens", exist_ok=True)
 
-    # Limpa a pasta temp
-    for f in os.listdir("temp"):
-        os.remove(os.path.join("temp", f))
+    for _ in range(tentativas):
+        crawler = GoogleImageCrawler(storage={"root_dir": "imagens"})
+        crawler.crawl(keyword=termos, max_num=1, file_idx_offset=0)
 
-    # Busca no Google imagens do carro inteiro (frente ou lateral)
-    crawler = GoogleImageCrawler(storage={"root_dir": "temp"})
-    crawler.crawl(keyword=termos + " carro inteiro frente ou lateral -logo", max_num=1)
-
-    arquivos = os.listdir("temp")
-    if arquivos:
-        original = os.path.join("temp", arquivos[0])
-        shutil.copy(original, caminho_arquivo)
-
-        # Upload para Cloudinary
-        resultado = cloudinary.uploader.upload(
-            original,
-            public_id=nome_base,
-            folder="veiculos_apex",  # opcional, ajuda a organizar
-            overwrite=True
+        arquivos = sorted(
+            os.listdir("imagens"),
+            key=lambda x: os.path.getctime(os.path.join("imagens", x)),
+            reverse=True
         )
-
-        url = resultado["secure_url"]
-
-        # Salva URL em cache para evitar upload repetido
-        with open(url_cache_path, "w") as f:
-            f.write(url)
-
-        return url
+        for arq in arquivos:
+            if arq.endswith(".jpg") and not arq.startswith(termos.replace(" ", "_")):
+                caminho_temp = os.path.join("imagens", arq)
+                if imagem_valida(caminho_temp):
+                    os.rename(caminho_temp, caminho_arquivo)
+                    return caminho_arquivo
+                else:
+                    os.remove(caminho_temp)
 
     return None

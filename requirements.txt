@@ -1,4 +1,4 @@
 Flask
-gunicorn
 icrawler
-cloudinary
+gunicorn
+pillow
