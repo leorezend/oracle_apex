@@ -1,20 +1,22 @@
-from flask import Flask, redirect, abort
-from baixar_imagem import montar_termos, baixar_e_retornar_cloudinary_url
+from flask import Flask, request, jsonify
+from baixar_imagem import buscar_imagem
+import os
 
 app = Flask(__name__)
 
-@app.route('/imagens/<path:arquivo>.jpg')
-def servir_imagem(arquivo):
-    nome = arquivo.replace("_", " ")
-    partes = nome.split()
-    if len(partes) < 4:
-        abort(400)
+@app.route("/buscar_imagem", methods=["GET"])
+def buscar():
+    marca = request.args.get("marca", "")
+    modelo = request.args.get("modelo", "")
+    cor = request.args.get("cor", "")
+    ano = request.args.get("ano", "")
 
-    marca, modelo, cor, ano = partes[0], partes[1], partes[2], partes[3]
-    termos = montar_termos(marca, modelo, cor, ano)
-    url = baixar_e_retornar_cloudinary_url(termos)
-
+    url = buscar_imagem(marca, modelo, cor, ano)
     if url:
-        return redirect(url)
+        return jsonify({"url": url})
     else:
-        abort(404)
+        return jsonify({"erro": "Imagem não encontrada"}), 404
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
