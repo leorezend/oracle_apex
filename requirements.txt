@@ -1,8 +1,5 @@
-flask
-flask-cors
-requests
-cloudinary
-Pillow
-opencv-python-headless
-beautifulsoup4
+Flask
+icrawler
 gunicorn
+pillow
+cloudinary
