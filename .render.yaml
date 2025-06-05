@@ -1,6 +1,9 @@
-services:
+ services:
   - type: web
-    name: oracle-apex
+    name: projeto-imagem-veiculo
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python main.py
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn main:app"
+    plan: free
+    autoDeploy: true
+    region: oregon
