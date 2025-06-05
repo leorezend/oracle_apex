@@ -33,7 +33,7 @@ def buscar_ou_retornar_imagem(marca, modelo, cor, ano):
     except:
         pass
 
-    urls = buscar_imagens_no_google(marca, modelo, ano)
+    urls = buscar_imagens_na_web(marca, modelo, ano)
     for url in urls:
         try:
             img_temp = baixar_imagem_temp(url)
@@ -49,14 +49,22 @@ def buscar_ou_retornar_imagem(marca, modelo, cor, ano):
             continue
     return None
 
-def buscar_imagens_no_google(marca, modelo, ano):
+def buscar_imagens_na_web(marca, modelo, ano):
+    from bs4 import BeautifulSoup
+
+    headers = {
+        "User-Agent": "Mozilla/5.0"
+    }
     query = quote(f"{marca} {modelo} {ano} carro")
-    endpoint = f"https://www.googleapis.com/customsearch/v1?q={query}&searchType=image&key=SUA_API&cx=SEU_CX"
-    resp = requests.get(endpoint)
-    if resp.status_code != 200:
+    url = f"https://www.google.com/search?q={query}&tbm=isch"
+
+    try:
+        response = requests.get(url, headers=headers)
+        soup = BeautifulSoup(response.text, "html.parser")
+        imgs = soup.select("img")
+        return [img["src"] for img in imgs if img.get("src", "").startswith("http")][:10]
+    except:
         return []
-    data = resp.json()
-    return [item["link"] for item in data.get("items", [])]
 
 def baixar_imagem_temp(url):
     try:
@@ -73,14 +81,12 @@ def cor_dominante_bate(caminho, cor_esperada):
     try:
         dominante = ColorThief(caminho).get_color(quality=1)
         cor_esperada = cor_esperada.lower()
-        branco = (200, 200, 200)
-        preto = (50, 50, 50)
 
         if cor_esperada == "preta":
             return all(c <= 80 for c in dominante)
         elif cor_esperada == "branca":
             return all(c >= 200 for c in dominante)
         else:
-            return True  # Aceita qualquer outra cor por enquanto
+            return True
     except:
         return True
