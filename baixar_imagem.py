@@ -4,6 +4,7 @@ import requests
 from PIL import Image
 from io import BytesIO
 import cloudinary.uploader
+import cloudinary.api
 import cv2
 import numpy as np
 from bs4 import BeautifulSoup
@@ -34,12 +35,30 @@ def proporcao_valida(img_pil):
     return 1.3 < ratio < 1.8 and w >= 400 and h >= 300
 
 def contem_texto(img_pil):
-    return False  # Você pode usar pytesseract se quiser OCR real futuramente
+    return False  # Implementar OCR futuramente se necessário
 
 def imagem_valida(img_pil):
     return proporcao_valida(img_pil) and not tem_rosto(img_pil) and not contem_texto(img_pil)
 
+def verificar_cache(nome_public_id):
+    try:
+        result = cloudinary.api.resource(f"veiculos_apex/{nome_public_id}")
+        return result["secure_url"]
+    except cloudinary.exceptions.NotFound:
+        return None
+    except Exception as e:
+        print("Erro ao verificar cache Cloudinary:", e)
+        return None
+
 def buscar_imagem(marca, modelo, cor, ano):
+    nome = sanitize_filename(f"{marca}_{modelo}_{cor}_{ano}")
+
+    # Verifica se já existe no Cloudinary
+    url_cache = verificar_cache(nome)
+    if url_cache:
+        return url_cache
+
+    # Busca no Google Images
     termo = f"{marca} {modelo} {ano} {cor} carro de frente ou diagonal"
     url = f"https://www.google.com/search?tbm=isch&q={termo.replace(' ', '+')}"
 
@@ -57,7 +76,6 @@ def buscar_imagem(marca, modelo, cor, ano):
             imagem = Image.open(BytesIO(imagem_resp.content)).convert("RGB")
 
             if imagem_valida(imagem):
-                nome = sanitize_filename(f"{marca}_{modelo}_{ano}_{cor}")
                 upload_result = cloudinary.uploader.upload(
                     BytesIO(imagem_resp.content),
                     public_id=nome,
@@ -66,7 +84,8 @@ def buscar_imagem(marca, modelo, cor, ano):
                     resource_type="image"
                 )
                 return upload_result["secure_url"]
-        except Exception:
+        except Exception as e:
+            print("Erro ao processar imagem:", e)
             continue
 
     return None
