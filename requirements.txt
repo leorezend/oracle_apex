@@ -4,3 +4,4 @@ cloudinary
 pillow
 opencv-python-headless
 beautifulsoup4
+gunicorn
