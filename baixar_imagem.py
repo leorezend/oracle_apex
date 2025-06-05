@@ -1,12 +1,12 @@
 import os
-import re
+import hashlib
+import tempfile
 import requests
+from urllib.parse import quote
 from PIL import Image
-from io import BytesIO
 import cloudinary.uploader
-import cv2
-import numpy as np
-from bs4 import BeautifulSoup
+import cloudinary.api
+from colorthief import ColorThief
 
 cloudinary.config(
     cloud_name="dzqt6j9bj",
@@ -14,59 +14,73 @@ cloudinary.config(
     api_secret=os.getenv("CLOUDINARY_SECRET")
 )
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0"
-}
+def gerar_nome_imagem(marca, modelo, cor, ano):
+    chave = f"{marca}_{modelo}_{cor}_{ano}".lower().replace(" ", "_")
+    return hashlib.md5(chave.encode()).hexdigest()
 
-def sanitize_filename(nome):
-    return re.sub(r"[^a-zA-Z0-9_-]", "_", nome)
+def buscar_ou_retornar_imagem(marca, modelo, cor, ano):
+    nome_imagem = gerar_nome_imagem(marca, modelo, cor, ano)
+    public_id = f"veiculos/{nome_imagem}"
 
-def tem_rosto(img_pil):
-    img_cv = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
-    gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-    faces = face_cascade.detectMultiScale(gray, 1.1, 4)
-    return len(faces) > 0
+    try:
+        url = cloudinary.api.resource(public_id)["secure_url"]
+        resposta = requests.get(url, stream=True)
+        if resposta.status_code == 200:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_file:
+                for chunk in resposta.iter_content(1024):
+                    temp_file.write(chunk)
+                return temp_file.name
+    except:
+        pass
 
-def proporcao_valida(img_pil):
-    w, h = img_pil.size
-    ratio = w / h
-    return 1.3 < ratio < 1.8 and w >= 400 and h >= 300
-
-def contem_texto(img_pil):
-    return False  # Você pode usar pytesseract se quiser OCR real futuramente
-
-def imagem_valida(img_pil):
-    return proporcao_valida(img_pil) and not tem_rosto(img_pil) and not contem_texto(img_pil)
-
-def buscar_imagem(marca, modelo, cor, ano):
-    termo = f"{marca} {modelo} {ano} {cor} carro de frente ou diagonal"
-    url = f"https://www.google.com/search?tbm=isch&q={termo.replace(' ', '+')}"
-
-    resposta = requests.get(url, headers=HEADERS)
-    soup = BeautifulSoup(resposta.text, 'html.parser')
-    imagens = soup.find_all("img")
-
-    for img_tag in imagens[1:15]:
-        src = img_tag.get("src")
-        if not src or not src.startswith("http"):
-            continue
-
+    urls = buscar_imagens_no_google(marca, modelo, ano)
+    for url in urls:
         try:
-            imagem_resp = requests.get(src, timeout=5)
-            imagem = Image.open(BytesIO(imagem_resp.content)).convert("RGB")
+            img_temp = baixar_imagem_temp(url)
+            if not img_temp:
+                continue
 
-            if imagem_valida(imagem):
-                nome = sanitize_filename(f"{marca}_{modelo}_{ano}_{cor}")
-                upload_result = cloudinary.uploader.upload(
-                    BytesIO(imagem_resp.content),
-                    public_id=nome,
-                    folder="veiculos_apex",
-                    overwrite=True,
-                    resource_type="image"
-                )
-                return upload_result["secure_url"]
-        except Exception:
+            if not cor_dominante_bate(img_temp, cor):
+                continue
+
+            upload = cloudinary.uploader.upload(img_temp, public_id=public_id, overwrite=True)
+            return img_temp
+        except:
             continue
-
     return None
+
+def buscar_imagens_no_google(marca, modelo, ano):
+    query = quote(f"{marca} {modelo} {ano} carro")
+    endpoint = f"https://www.googleapis.com/customsearch/v1?q={query}&searchType=image&key=SUA_API&cx=SEU_CX"
+    resp = requests.get(endpoint)
+    if resp.status_code != 200:
+        return []
+    data = resp.json()
+    return [item["link"] for item in data.get("items", [])]
+
+def baixar_imagem_temp(url):
+    try:
+        resposta = requests.get(url, timeout=5)
+        if resposta.status_code != 200:
+            return None
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_file:
+            temp_file.write(resposta.content)
+            return temp_file.name
+    except:
+        return None
+
+def cor_dominante_bate(caminho, cor_esperada):
+    try:
+        dominante = ColorThief(caminho).get_color(quality=1)
+        cor_esperada = cor_esperada.lower()
+        branco = (200, 200, 200)
+        preto = (50, 50, 50)
+
+        if cor_esperada == "preta":
+            return all(c <= 80 for c in dominante)
+        elif cor_esperada == "branca":
+            return all(c >= 200 for c in dominante)
+        else:
+            return True  # Aceita qualquer outra cor por enquanto
+    except:
+        return True

@@ -1,6 +1,6 @@
-flask
-requests
-cloudinary
-pillow
-opencv-python-headless
-beautifulsoup4
+Flask==2.3.3
+requests==2.31.0
+cloudinary==1.34.0
+Pillow==10.2.0
+colorthief==0.2.1
+gunicorn==21.2.0
