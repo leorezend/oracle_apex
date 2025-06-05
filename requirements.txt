@@ -4,3 +4,4 @@ cloudinary
 pillow
 colorthief
 beautifulsoup4
+gunicorn
