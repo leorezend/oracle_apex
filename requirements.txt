@@ -1,7 +1,8 @@
 flask
+flask-cors
 requests
 cloudinary
-pillow
+Pillow
 opencv-python-headless
 beautifulsoup4
 gunicorn
