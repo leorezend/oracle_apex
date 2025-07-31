@@ -15,6 +15,7 @@ def servir_imagem(arquivo):
     url = baixar_e_retornar_cloudinary_url(termos)
 
     if url:
-        return redirect(url)
+        url_otimizada = url.replace("upload/", "upload/f_auto,q_auto/")
+        return redirect(url_otimizada)
     else:
         abort(404)
