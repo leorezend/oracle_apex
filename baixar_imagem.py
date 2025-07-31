@@ -1,10 +1,10 @@
-from icrawler.builtin import GoogleImageCrawler
-from icrawler import settings
-from PIL import Image
 import os
+from icrawler.builtin import GoogleImageCrawler
+from PIL import Image
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
+
 
 cloudinary.config(
     cloud_name='dzqt6j9bj',
@@ -63,7 +63,7 @@ def baixar_e_retornar_cloudinary_url(termos, tentativas=3):
         for arq in arquivos:
             caminho_temp = os.path.join("imagens", arq)
 
-            # ⚠️ Filtro automático por nome de arquivo/dominio problemático
+            #  Filtro automático por nome de arquivo/dominio problemático
             nome_arquivo = arq.lower()
             if any(site in nome_arquivo for site in ['reddit', 'redd', 'pinterest', 'tumblr', 'blogspot']):
                 print(f"[DESCARTADA] Imagem de site indesejado: {arq}")
